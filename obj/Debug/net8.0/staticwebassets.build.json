@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "NJ1lr2m/H9qiKV8VJWeUp0iKNcsbjKniyRtk6OdKXFI=",
+  "Source": "services-order-add",
+  "BasePath": "_content/services-order-add",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
