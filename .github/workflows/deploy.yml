@@ -1,24 +1,31 @@
 name: CI/CD to EC2
- 
+
 on:
   push:
     branches: [ "QA" ]
- 
+
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source
         uses: actions/checkout@v3
- 
+
       - name: Login to Docker Hub
-        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
- 
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
       - name: Build Docker Image
-        run: docker build -t anggeloo/microservice-add-order:latest .
- 
+        run: |
+          docker build -t anggeloo/microservice-add-order:latest .
+          docker tag anggeloo/microservice-add-order:latest anggeloo/microservice-add-order:${{ github.sha }}
+
       - name: Push Docker Image
-        run: docker push anggeloo/microservice-add-order:latest
+        run: |
+          docker push anggeloo/microservice-add-order:latest
+          docker push anggeloo/microservice-add-order:${{ github.sha }}
 
   deploy-to-ec2:
     needs: build-and-push-image
@@ -31,27 +38,22 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_PRIVATE_KEY }}
           script: |
-            echo "Iniciando despliegue en EC2..."
+            echo "Starting deployment on EC2..."
             
-            # 1) Bajar la última imagen del Docker Hub
+            # 1) Navigate to the directory where docker-compose.yml is located
+            cd /home/ubuntu/
+            
+            # 2) Pull the latest image from Docker Hub
             docker pull anggeloo/microservice-add-order:latest
             
-            # 2) Detener y eliminar el contenedor previo si existe
-            docker stop order_add_container || true
-            docker rm order_add_container || true
+            # 3) Stop and remove previous containers
+            docker-compose down
             
-            # 3) Eliminar cualquier imagen vieja para ahorrar espacio
-            docker image prune -f
-
-            # 4) Crear el archivo .env con las credenciales correctas
+            # 4) Create the .env file with the correct credentials
             echo "MYSQL_CONNECTION_STRING=Server=${{ secrets.DB_HOST }};Database=${{ secrets.DB_NAME }};User=${{ secrets.DB_USER }};Password=${{ secrets.DB_PASS }}" > .env
             echo "PORT=${{ secrets.PORT }}" >> .env
             
-            # 5) Correr el contenedor con la configuración correcta
-            docker run -d --name order_add_container \
-              --env-file .env \
-              -p 81:80 \
-              -p 5001:5000 \
-              anggeloo/microservice-add-order:latest
-
-            echo "Despliegue completado exitosamente."
+            # 5) Start new containers using docker-compose
+            docker-compose up -d --remove-orphans
+            
+            echo "Deployment successfully completed."
